@@ -101,7 +101,7 @@
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="deepCompare" class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500">
                     <span class="text-sm text-gray-700">
-                        Deep compare JSON values (ignore key order in nested objects)
+                        <strong>Deep mode:</strong> Show all nested keys separately (compare leaf values only)
                     </span>
                 </label>
             </div>
@@ -306,13 +306,24 @@
         }
 
         // Get all keys from nested object paths
-        function getAllKeys(obj, prefix = '') {
+        function getAllKeys(obj, prefix = '', leafOnly = false) {
             const keys = [];
             for (const key in obj) {
                 const fullKey = prefix ? `${prefix}.${key}` : key;
-                keys.push(fullKey);
-                if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-                    keys.push(...getAllKeys(obj[key], fullKey));
+                const value = obj[key];
+                const isObject = typeof value === 'object' && value !== null && !Array.isArray(value);
+
+                if (isObject) {
+                    // If it's an object, recurse into it
+                    const childKeys = getAllKeys(value, fullKey, leafOnly);
+                    keys.push(...childKeys);
+                    // Only add parent key if not leaf-only mode
+                    if (!leafOnly) {
+                        keys.push(fullKey);
+                    }
+                } else {
+                    // It's a leaf node (primitive or array), always add it
+                    keys.push(fullKey);
                 }
             }
             return keys;
@@ -389,11 +400,12 @@
 
         // Compare two JSON objects
         function compareJSON() {
-            const keys1 = getAllKeys(file1Data);
-            const keys2 = getAllKeys(file2Data);
-
             // Get deep compare option
             const useDeepCompare = document.getElementById('deepCompare').checked;
+
+            // In deep mode, only get leaf nodes (final values)
+            const keys1 = getAllKeys(file1Data, '', useDeepCompare);
+            const keys2 = getAllKeys(file2Data, '', useDeepCompare);
 
             // Create mapping of keys to their positions
             const keyPos1 = new Map(keys1.map((key, idx) => [key, idx]));
@@ -562,7 +574,16 @@
         setupFileUpload('upload1', 'file1', 'file1-name');
         setupFileUpload('upload2', 'file2', 'file2-name');
 
+        // Compare button click handler
         document.getElementById('compareBtn').addEventListener('click', compareJSON);
+
+        // Real-time toggle for deep compare mode
+        document.getElementById('deepCompare').addEventListener('change', () => {
+            // If results already exist, re-compare automatically
+            if (allResults.length > 0) {
+                compareJSON();
+            }
+        });
     </script>
 </body>
 </html>
