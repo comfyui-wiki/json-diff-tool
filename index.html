@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Key Comparison Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .key-added { background-color: #d4edda; color: #155724; }
+        .key-removed { background-color: #f8d7da; color: #721c24; }
+        .key-moved { background-color: #fff3cd; color: #856404; }
+        .key-unchanged { background-color: #f8f9fa; color: #495057; }
+        .key-value-changed { background-color: #d1ecf1; color: #0c5460; }
+
+        .upload-zone {
+            border: 2px dashed #cbd5e0;
+            transition: all 0.3s ease;
+        }
+        .upload-zone:hover {
+            border-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+        .upload-zone.dragover {
+            border-color: #3182ce;
+            background-color: #bee3f8;
+        }
+        .upload-zone.uploaded {
+            border-color: #48bb78;
+            background-color: #f0fff4;
+        }
+
+        .filter-btn {
+            transition: all 0.2s ease;
+        }
+        .filter-btn.active {
+            transform: scale(1.05);
+        }
+
+        .diff-table {
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 13px;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 1rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 p-8">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">JSON Key Comparison Tool</h1>
+
+        <!-- Upload Area -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-700 mb-3">Original JSON (Old Version)</h2>
+                <div class="upload-zone bg-white rounded-lg p-8 text-center cursor-pointer" id="upload1">
+                    <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" id="upload1-icon" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <!-- Success checkmark (hidden by default) -->
+                    <svg class="mx-auto h-12 w-12 text-green-500 mb-3 hidden" id="upload1-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-gray-600" id="upload1-text">Click or drag to upload JSON file</p>
+                    <p class="text-gray-400 text-sm mt-2" id="file1-name">No file selected</p>
+                    <p class="text-green-600 text-sm mt-1 hidden" id="file1-status"></p>
+                    <input type="file" id="file1" accept=".json" class="hidden">
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-lg font-semibold text-gray-700 mb-3">Comparison JSON (New Version)</h2>
+                <div class="upload-zone bg-white rounded-lg p-8 text-center cursor-pointer" id="upload2">
+                    <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" id="upload2-icon" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <!-- Success checkmark (hidden by default) -->
+                    <svg class="mx-auto h-12 w-12 text-green-500 mb-3 hidden" id="upload2-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-gray-600" id="upload2-text">Click or drag to upload JSON file</p>
+                    <p class="text-gray-400 text-sm mt-2" id="file2-name">No file selected</p>
+                    <p class="text-green-600 text-sm mt-1 hidden" id="file2-status"></p>
+                    <input type="file" id="file2" accept=".json" class="hidden">
+                </div>
+            </div>
+        </div>
+
+        <!-- Compare Button -->
+        <div class="text-center mb-8">
+            <div class="flex flex-col items-center gap-4">
+                <button id="compareBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    Start Comparison
+                </button>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="deepCompare" class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500">
+                    <span class="text-sm text-gray-700">
+                        Deep compare JSON values (ignore key order in nested objects)
+                    </span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Legend and Filter -->
+        <div id="legend" class="bg-white rounded-lg p-4 mb-6 hidden">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3 md:mb-0">Legend & Filter</h3>
+                <div class="flex flex-wrap gap-2">
+                    <button class="filter-btn px-4 py-2 rounded-lg font-semibold bg-blue-600 text-white active" data-filter="all">
+                        All
+                    </button>
+                    <button class="filter-btn px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300" data-filter="added">
+                        + Added
+                    </button>
+                    <button class="filter-btn px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300" data-filter="removed">
+                        - Removed
+                    </button>
+                    <button class="filter-btn px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300" data-filter="moved">
+                        ↕ Moved
+                    </button>
+                    <button class="filter-btn px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300" data-filter="changed">
+                        ≠ Changed
+                    </button>
+                    <button class="filter-btn px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300" data-filter="unchanged">
+                        = Unchanged
+                    </button>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <span class="legend-item key-added">+ Added Keys</span>
+                <span class="legend-item key-removed">- Removed Keys</span>
+                <span class="legend-item key-moved">↕ Position Changed</span>
+                <span class="legend-item key-value-changed">≠ Value Changed</span>
+                <span class="legend-item key-unchanged">= Unchanged</span>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div id="stats" class="bg-white rounded-lg p-6 mb-6 hidden">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">Comparison Statistics</h3>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-green-600" id="stat-added">0</div>
+                    <div class="text-sm text-gray-600">Added</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-red-600" id="stat-removed">0</div>
+                    <div class="text-sm text-gray-600">Removed</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-yellow-600" id="stat-moved">0</div>
+                    <div class="text-sm text-gray-600">Moved</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-blue-600" id="stat-changed">0</div>
+                    <div class="text-sm text-gray-600">Changed</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-gray-600" id="stat-unchanged">0</div>
+                    <div class="text-sm text-gray-600">Unchanged</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Display -->
+        <div id="results" class="bg-white rounded-lg shadow-lg overflow-hidden hidden">
+            <div class="p-4 bg-gray-100 border-b">
+                <h3 class="text-lg font-semibold text-gray-700">Comparison Results</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="diff-table w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Status</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Key</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Old Pos</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">New Pos</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Old Value</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">New Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let file1Data = null;
+        let file2Data = null;
+        let allResults = []; // Store all results for filtering
+
+        // Escape HTML to prevent XSS and display content correctly
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Setup file upload functionality
+        function setupFileUpload(uploadZoneId, fileInputId, fileNameId) {
+            const uploadZone = document.getElementById(uploadZoneId);
+            const fileInput = document.getElementById(fileInputId);
+            const fileName = document.getElementById(fileNameId);
+
+            uploadZone.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    fileName.textContent = file.name;
+                    readFile(file, fileInputId);
+                }
+            });
+
+            // Drag and drop upload
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('dragover');
+            });
+
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('dragover');
+            });
+
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file && file.type === 'application/json') {
+                    fileName.textContent = file.name;
+                    fileInput.files = e.dataTransfer.files;
+                    readFile(file, fileInputId);
+                }
+            });
+        }
+
+        // Update upload status display
+        function updateUploadStatus(fileInputId, file, success) {
+            const fileNum = fileInputId === 'file1' ? '1' : '2';
+            const uploadZone = document.getElementById(`upload${fileNum}`);
+            const uploadIcon = document.getElementById(`upload${fileNum}-icon`);
+            const successIcon = document.getElementById(`upload${fileNum}-success`);
+            const uploadText = document.getElementById(`upload${fileNum}-text`);
+            const statusText = document.getElementById(`file${fileNum}-status`);
+
+            if (success) {
+                // Show success state
+                uploadZone.classList.add('uploaded');
+                uploadIcon.classList.add('hidden');
+                successIcon.classList.remove('hidden');
+                uploadText.textContent = 'File uploaded successfully!';
+                uploadText.classList.remove('text-gray-600');
+                uploadText.classList.add('text-green-600', 'font-semibold');
+
+                // Show file size
+                const sizeKB = (file.size / 1024).toFixed(2);
+                const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+                const sizeStr = file.size > 1024 * 1024 ? `${sizeMB} MB` : `${sizeKB} KB`;
+                statusText.textContent = `Size: ${sizeStr} | Keys: ${Object.keys(fileInputId === 'file1' ? file1Data : file2Data).length}`;
+                statusText.classList.remove('hidden');
+            } else {
+                // Reset to default state
+                uploadZone.classList.remove('uploaded');
+                uploadIcon.classList.remove('hidden');
+                successIcon.classList.add('hidden');
+                uploadText.textContent = 'Click or drag to upload JSON file';
+                uploadText.classList.remove('text-green-600', 'font-semibold');
+                uploadText.classList.add('text-gray-600');
+                statusText.classList.add('hidden');
+            }
+        }
+
+        // Read file content
+        function readFile(file, fileInputId) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (fileInputId === 'file1') {
+                        file1Data = data;
+                    } else {
+                        file2Data = data;
+                    }
+                    updateUploadStatus(fileInputId, file, true);
+                    checkEnableCompare();
+                } catch (error) {
+                    alert('JSON parsing failed: ' + error.message);
+                    updateUploadStatus(fileInputId, file, false);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Check if comparison can be enabled
+        function checkEnableCompare() {
+            const compareBtn = document.getElementById('compareBtn');
+            compareBtn.disabled = !(file1Data && file2Data);
+        }
+
+        // Get all keys from nested object paths
+        function getAllKeys(obj, prefix = '') {
+            const keys = [];
+            for (const key in obj) {
+                const fullKey = prefix ? `${prefix}.${key}` : key;
+                keys.push(fullKey);
+                if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+                    keys.push(...getAllKeys(obj[key], fullKey));
+                }
+            }
+            return keys;
+        }
+
+        // Get string representation of value for display
+        function getValueString(obj, keyPath) {
+            const keys = keyPath.split('.');
+            let value = obj;
+            for (const key of keys) {
+                if (value && typeof value === 'object') {
+                    value = value[key];
+                } else {
+                    return undefined;
+                }
+            }
+            if (value === undefined) return 'undefined';
+            if (value === null) return 'null';
+            const str = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+            return str;
+        }
+
+        // Deep compare two values (ignoring key order)
+        function deepEqual(val1, val2) {
+            // Handle primitives and null
+            if (val1 === val2) return true;
+            if (val1 == null || val2 == null) return false;
+            if (typeof val1 !== 'object' || typeof val2 !== 'object') return false;
+
+            // Handle arrays
+            if (Array.isArray(val1) && Array.isArray(val2)) {
+                if (val1.length !== val2.length) return false;
+                for (let i = 0; i < val1.length; i++) {
+                    if (!deepEqual(val1[i], val2[i])) return false;
+                }
+                return true;
+            }
+
+            // One is array, other is not
+            if (Array.isArray(val1) !== Array.isArray(val2)) return false;
+
+            // Handle objects
+            const keys1 = Object.keys(val1);
+            const keys2 = Object.keys(val2);
+
+            if (keys1.length !== keys2.length) return false;
+
+            // Check if all keys exist and values are equal
+            for (const key of keys1) {
+                if (!keys2.includes(key)) return false;
+                if (!deepEqual(val1[key], val2[key])) return false;
+            }
+
+            return true;
+        }
+
+        // Check if two values are equal
+        function valuesEqual(obj1, obj2, keyPath, useDeepCompare = false) {
+            const keys = keyPath.split('.');
+            let val1 = obj1;
+            let val2 = obj2;
+
+            for (const key of keys) {
+                val1 = val1?.[key];
+                val2 = val2?.[key];
+            }
+
+            if (useDeepCompare) {
+                return deepEqual(val1, val2);
+            } else {
+                return JSON.stringify(val1) === JSON.stringify(val2);
+            }
+        }
+
+        // Compare two JSON objects
+        function compareJSON() {
+            const keys1 = getAllKeys(file1Data);
+            const keys2 = getAllKeys(file2Data);
+
+            // Get deep compare option
+            const useDeepCompare = document.getElementById('deepCompare').checked;
+
+            // Create mapping of keys to their positions
+            const keyPos1 = new Map(keys1.map((key, idx) => [key, idx]));
+            const keyPos2 = new Map(keys2.map((key, idx) => [key, idx]));
+
+            const allKeys = new Set([...keys1, ...keys2]);
+            const results = [];
+
+            let stats = {
+                added: 0,
+                removed: 0,
+                moved: 0,
+                changed: 0,
+                unchanged: 0
+            };
+
+            for (const key of allKeys) {
+                const inFile1 = keyPos1.has(key);
+                const inFile2 = keyPos2.has(key);
+
+                let status, statusSymbol, statusClass;
+
+                if (!inFile1 && inFile2) {
+                    status = 'Added';
+                    statusSymbol = '+';
+                    statusClass = 'key-added';
+                    stats.added++;
+                } else if (inFile1 && !inFile2) {
+                    status = 'Removed';
+                    statusSymbol = '-';
+                    statusClass = 'key-removed';
+                    stats.removed++;
+                } else {
+                    const pos1 = keyPos1.get(key);
+                    const pos2 = keyPos2.get(key);
+                    const valueChanged = !valuesEqual(file1Data, file2Data, key, useDeepCompare);
+
+                    if (valueChanged) {
+                        status = 'Value Changed';
+                        statusSymbol = '≠';
+                        statusClass = 'key-value-changed';
+                        stats.changed++;
+                    } else if (pos1 !== pos2) {
+                        status = 'Position Changed';
+                        statusSymbol = '↕';
+                        statusClass = 'key-moved';
+                        stats.moved++;
+                    } else {
+                        status = 'Unchanged';
+                        statusSymbol = '=';
+                        statusClass = 'key-unchanged';
+                        stats.unchanged++;
+                    }
+                }
+
+                results.push({
+                    key,
+                    status,
+                    statusSymbol,
+                    statusClass,
+                    pos1: keyPos1.get(key),
+                    pos2: keyPos2.get(key),
+                    value1: inFile1 ? getValueString(file1Data, key) : '-',
+                    value2: inFile2 ? getValueString(file2Data, key) : '-'
+                });
+            }
+
+            // Sort results alphabetically by key
+            results.sort((a, b) => a.key.localeCompare(b.key));
+
+            // Store results globally for filtering
+            allResults = results;
+
+            displayResults(results, stats);
+            setupFilters();
+        }
+
+        // Display comparison results
+        function displayResults(results, stats, isFiltered = false) {
+            const resultsBody = document.getElementById('resultsBody');
+            resultsBody.innerHTML = '';
+
+            results.forEach(result => {
+                const row = document.createElement('tr');
+                row.className = result.statusClass;
+                row.innerHTML = `
+                    <td class="px-4 py-3 whitespace-nowrap font-semibold align-top">${result.statusSymbol}</td>
+                    <td class="px-4 py-3 font-medium align-top break-words max-w-xs">${escapeHtml(result.key)}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-center align-top">${result.pos1 !== undefined ? result.pos1 : '-'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-center align-top">${result.pos2 !== undefined ? result.pos2 : '-'}</td>
+                    <td class="px-4 py-3 text-sm align-top break-words whitespace-pre-wrap max-w-xl">${escapeHtml(result.value1)}</td>
+                    <td class="px-4 py-3 text-sm align-top break-words whitespace-pre-wrap max-w-xl">${escapeHtml(result.value2)}</td>
+                `;
+                resultsBody.appendChild(row);
+            });
+
+            // Update statistics
+            document.getElementById('stat-added').textContent = stats.added;
+            document.getElementById('stat-removed').textContent = stats.removed;
+            document.getElementById('stat-moved').textContent = stats.moved;
+            document.getElementById('stat-changed').textContent = stats.changed;
+            document.getElementById('stat-unchanged').textContent = stats.unchanged;
+
+            // Show results sections
+            document.getElementById('legend').classList.remove('hidden');
+            document.getElementById('stats').classList.remove('hidden');
+            document.getElementById('results').classList.remove('hidden');
+
+            // Scroll to results (only on initial display, not when filtering)
+            if (!isFiltered) {
+                document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Setup filter functionality
+        function setupFilters() {
+            const filterButtons = document.querySelectorAll('.filter-btn');
+
+            filterButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    // Update active button state
+                    filterButtons.forEach(btn => {
+                        btn.classList.remove('active', 'bg-blue-600', 'text-white');
+                        btn.classList.add('bg-gray-200', 'text-gray-700');
+                    });
+                    button.classList.add('active', 'bg-blue-600', 'text-white');
+                    button.classList.remove('bg-gray-200', 'text-gray-700');
+
+                    // Apply filter
+                    const filterType = button.getAttribute('data-filter');
+                    applyFilter(filterType);
+                });
+            });
+        }
+
+        // Apply filter to results
+        function applyFilter(filterType) {
+            let filteredResults = allResults;
+
+            if (filterType !== 'all') {
+                const statusMap = {
+                    'added': 'Added',
+                    'removed': 'Removed',
+                    'moved': 'Position Changed',
+                    'changed': 'Value Changed',
+                    'unchanged': 'Unchanged'
+                };
+
+                const targetStatus = statusMap[filterType];
+                filteredResults = allResults.filter(result => result.status === targetStatus);
+            }
+
+            // Calculate filtered stats
+            const filteredStats = {
+                added: filteredResults.filter(r => r.status === 'Added').length,
+                removed: filteredResults.filter(r => r.status === 'Removed').length,
+                moved: filteredResults.filter(r => r.status === 'Position Changed').length,
+                changed: filteredResults.filter(r => r.status === 'Value Changed').length,
+                unchanged: filteredResults.filter(r => r.status === 'Unchanged').length
+            };
+
+            displayResults(filteredResults, filteredStats, true);
+        }
+
+        // Initialize upload zones
+        setupFileUpload('upload1', 'file1', 'file1-name');
+        setupFileUpload('upload2', 'file2', 'file2-name');
+
+        document.getElementById('compareBtn').addEventListener('click', compareJSON);
+    </script>
+</body>
+</html>
